@@ -1,451 +1,319 @@
 # ai-writing-workflow
 ```mermaid
 graph TB
-    Start([Game Start]) --> Init[Initialize Game]
-    Init --> LoadMemory[Load Long-term Memory]
-    LoadMemory --> AssignRoles[Assign Roles]
-    AssignRoles --> GameLoop{Game Main Loop}
+    Start([Start: 用户提交写作任务]) --> Init[初始化任务<br/>加载配置]
+    Init --> LoadMemory[加载长期写作经验]
+    LoadMemory --> AssignAgents[创建并分配角色 Agent]
+    AssignAgents --> MainLoop{写作主循环}
 
-    GameLoop --> NightPhase[Night Phase]
-    GameLoop --> DayPhase[Day Phase]
-    GameLoop --> CheckWin{Check Victory Conditions}
+    MainLoop --> PlanPhase[选题与结构规划阶段]
+    MainLoop --> DraftPhase[初稿撰写阶段]
+    MainLoop --> ReviewPhase[审稿与修改阶段]
+    MainLoop --> CheckDone{是否达到完成标准?}
 
-    CheckWin -->|Werewolf Win| WolfWin[Werewolf Team Wins]
-    CheckWin -->|Good Win| GoodWin[Good Team Wins]
-    CheckWin -->|Continue| GameLoop
+    CheckDone -->|是| Finalize[生成最终稿件]
+    CheckDone -->|否| MainLoop
 
-    WolfWin --> Analysis[Game Analysis]
-    GoodWin --> Analysis
-    Analysis --> SaveMemory[Save Experience to Memory]
-    SaveMemory --> End([Game End])
+    Finalize --> Analyze[写作过程分析]
+    Analyze --> SaveMemory[保存经验到长期记忆]
+    SaveMemory --> End([End: 输出论文与报告])
 
-    style Start fill:#90EE90
-    style End fill:#FFB6C1
-    style WolfWin fill:#FF6B6B
-    style GoodWin fill:#4ECDC4
-    style GameLoop fill:#FFE66D
+    style Start fill:#C8E6C9
+    style End fill:#FFCDD2
+    style MainLoop fill:#FFF9C4
+    style Finalize fill:#B2EBF2
 ```
-
-## Multi-Agent Interaction Architecture
 
 ```mermaid
 graph LR
-    subgraph "DeepSeek API"
-        API[DeepSeek Chat API]
+    subgraph "LLM API Layer"
+        API[LLM Chat API]
     end
 
-    subgraph "Game Control Layer"
-        GameMaster[Game Master<br/>WerewolfGame]
-        GameState[Game State Management<br/>GameState]
-        Memory[Long-term Memory<br/>MemoryManager]
+    subgraph "Control Layer"
+        Orchestrator[写作协调器<br/>WritingOrchestrator]
+        DocState[文稿状态管理<br/>DocumentState]
+        Memory[长期记忆管理<br/>WritingMemoryManager]
     end
 
     subgraph "AI Agent Layer"
-        Wolf1[Werewolf Agent #1]
-        Wolf2[Werewolf Agent #2]
-        Villager1[Villager Agent #1]
-        Villager2[Villager Agent #2]
-        Villager3[Villager Agent #3]
-        Seer[Seer Agent]
-        Witch[Witch Agent]
-        Hunter[Hunter Agent]
+        TopicAgent[选题 Agent]
+        SearchAgent[文献检索 Agent]
+        OutlineAgent[提纲规划 Agent]
+        DraftAgent[正文撰写 Agent]
+        ReviewerAgent[审稿 Agent]
+        RewriterAgent[重写 Agent]
+        CitationAgent[引用格式 Agent]
     end
 
-    GameMaster --> GameState
-    GameMaster --> Memory
+    Orchestrator --> DocState
+    Orchestrator --> Memory
 
-    GameMaster -.Query.-> Wolf1
-    GameMaster -.Query.-> Wolf2
-    GameMaster -.Query.-> Villager1
-    GameMaster -.Query.-> Villager2
-    GameMaster -.Query.-> Villager3
-    GameMaster -.Query.-> Seer
-    GameMaster -.Query.-> Witch
-    GameMaster -.Query.-> Hunter
+    Orchestrator -.任务.-> TopicAgent
+    Orchestrator -.任务.-> SearchAgent
+    Orchestrator -.任务.-> OutlineAgent
+    Orchestrator -.任务.-> DraftAgent
+    Orchestrator -.任务.-> ReviewerAgent
+    Orchestrator -.任务.-> RewriterAgent
+    Orchestrator -.任务.-> CitationAgent
 
-    Wolf1 --> API
-    Wolf2 --> API
-    Villager1 --> API
-    Villager2 --> API
-    Villager3 --> API
-    Seer --> API
-    Witch --> API
-    Hunter --> API
+    TopicAgent --> API
+    SearchAgent --> API
+    OutlineAgent --> API
+    DraftAgent --> API
+    ReviewerAgent --> API
+    RewriterAgent --> API
+    CitationAgent --> API
 
-    API -.Return Decision.-> Wolf1
-    API -.Return Decision.-> Wolf2
-    API -.Return Decision.-> Villager1
-    API -.Return Decision.-> Villager2
-    API -.Return Decision.-> Villager3
-    API -.Return Decision.-> Seer
-    API -.Return Decision.-> Witch
-    API -.Return Decision.-> Hunter
+    API -.结果.-> TopicAgent
+    API -.结果.-> SearchAgent
+    API -.结果.-> OutlineAgent
+    API -.结果.-> DraftAgent
+    API -.反馈.-> ReviewerAgent
+    API -.反馈.-> RewriterAgent
+    API -.引用.-> CitationAgent
 
-    style GameMaster fill:#FFE66D
-    style API fill:#FF6B6B
+    TopicAgent --> Orchestrator
+    SearchAgent --> Orchestrator
+    OutlineAgent --> Orchestrator
+    DraftAgent --> Orchestrator
+    ReviewerAgent --> Orchestrator
+    RewriterAgent --> Orchestrator
+    CitationAgent --> Orchestrator
+
+    style Orchestrator fill:#FFE082
+    style API fill:#EF9A9A
 ```
-
-## Night Phase Flow
 
 ```mermaid
 sequenceDiagram
-    participant GM as Game Master
-    participant Wolf1 as Werewolf 1
-    participant Wolf2 as Werewolf 2
-    participant Seer as Seer
-    participant Witch as Witch
-    participant API as DeepSeek API
-    participant GS as Game State
+    participant User as User
+    participant OR as Orchestrator
+    participant Topic as Topic Agent
+    participant Search as Search Agent
+    participant Outline as Outline Agent
+    participant API as LLM API
+    participant DS as Document State
 
-    GM->>GM: Enter Night Phase
+    User->>OR: 提交写作需求
+    OR->>DS: 初始化文稿状态
 
-    rect rgb(240, 240, 240)
-        Note over GM,Wolf2: 1. Werewolves Discussion
-        GM->>Wolf1: Choose kill target
-        Wolf1->>API: Send context + history
-        API-->>Wolf1: Return decision
-        Wolf1-->>GM: Suggest killing player X
-
-        GM->>Wolf2: Choose kill target
-        Wolf2->>API: Send context + history
-        API-->>Wolf2: Return decision
-        Wolf2-->>GM: Suggest killing player Y
-
-        GM->>GM: Count werewolf votes
-        GM->>GS: Record kill target
+    rect rgb(240,248,255)
+        OR->>Topic: 分析需求并收敛选题
+        Topic->>API: 传入需求与历史经验
+        API-->>Topic: 返回备选题目
+        Topic-->>OR: 推荐题目
+        OR->>DS: 保存选题
     end
 
-    rect rgb(230, 230, 250)
-        Note over GM,Seer: 2. Seer Check Phase
-        GM->>Seer: Choose check target
-        Seer->>API: Send current info
-        API-->>Seer: Return decision
-        Seer-->>GM: Check player X
-        GM->>GS: Query player X identity
-        GS-->>GM: Return identity info
-        GM-->>Seer: Tell check result
+    rect rgb(255,250,240)
+        OR->>Search: 生成检索方向
+        Search->>API: 请求关键词
+        API-->>Search: 返回关键词
+        Search-->>OR: 输出文献方向
+        OR->>DS: 保存文献方向
     end
 
-    rect rgb(255, 240, 245)
-        Note over GM,Witch: 3. Witch Action Phase
-        GM->>Witch: Notify killed player
-        Witch->>API: Send current info
-        API-->>Witch: Return decision
-        Witch-->>GM: Decide to use potion
-        GM->>GS: Update night result
+    rect rgb(240,255,240)
+        OR->>Outline: 请求提纲
+        Outline->>API: 生成结构
+        API-->>Outline: 输出提纲
+        Outline-->>OR: 返回结构
+        OR->>DS: 保存提纲
     end
-
-    GM->>GM: End Night Phase
 ```
-
-## Day Phase Flow
 
 ```mermaid
 sequenceDiagram
-    participant GM as Game Master
-    participant P1 as Player 1
-    participant P2 as Player 2
-    participant PN as Player N
-    participant API as DeepSeek API
-    participant GS as Game State
+    participant OR as Orchestrator
+    participant Draft as Draft Agent
+    participant API as LLM API
+    participant DS as Document State
 
-    GM->>GM: Enter Day Phase
+    OR->>DS: 读取提纲
 
-    rect rgb(255, 250, 205)
-        Note over GM,GS: 1. Announce Deaths
-        GM->>GS: Query night deaths
-        GS-->>GM: Return death list
-        GM->>GM: Announce dead players
-        GM->>GM: Dead players' last words
+    loop 写作每一部分
+        OR->>Draft: 写作 Section N
+        Draft->>API: 发送上下文
+        API-->>Draft: 返回草稿
+        Draft-->>OR: 返回小节
+        OR->>DS: 更新文稿
     end
 
-    rect rgb(240, 255, 240)
-        Note over GM,PN: 2. Player Discussion
-        loop All Alive Players
-            GM->>P1: Your turn to speak
-            P1->>API: Send complete game info<br/>+ history memory
-            API-->>P1: Generate speech
-            P1-->>GM: Express opinion
-            GM->>GS: Record speech
-        end
-    end
-
-    rect rgb(255, 240, 240)
-        Note over GM,PN: 3. Voting Phase
-        loop All Alive Players
-            GM->>P1: Please vote
-            P1->>API: Analyze all speeches
-            API-->>P1: Return vote decision
-            P1-->>GM: Vote for player X
-            GM->>GS: Record vote
-        end
-
-        GM->>GM: Count vote results
-        GM->>GS: Execute most voted player
-        GM->>GM: Trigger Hunter ability (if Hunter)
-    end
-
-    GM->>GM: End Day Phase
+    OR->>OR: 初稿完成
 ```
 
-## Single AI Agent Decision Flow
+```mermaid
+sequenceDiagram
+    participant OR as Orchestrator
+    participant Reviewer as Reviewer Agent
+    participant Rewriter as Rewriter Agent
+    participant API as LLM API
+    participant DS as Document State
+
+    OR->>DS: 导出完整草稿
+    OR->>Reviewer: 请求审稿
+
+    Reviewer->>API: 提交草稿
+    API-->>Reviewer: 返回问题与建议
+    Reviewer-->>OR: 审稿报告
+    OR->>DS: 保存审稿意见
+
+    OR->>Rewriter: 根据意见改写
+    Rewriter->>API: 提交原文+意见
+    API-->>Rewriter: 返回改写结果
+    Rewriter-->>OR: 提交修改
+    OR->>DS: 更新文稿
+```
 
 ```mermaid
 graph TB
-    Start([Receive Game State]) --> LoadHistory[Load History Memory]
-    LoadHistory --> BuildContext[Build Context]
+    Start([Agent 接收任务]) --> LoadMem[加载历史经验]
+    LoadMem --> GatherState[收集文稿状态]
+    GatherState --> BuildContext[构建上下文]
 
-    BuildContext --> ContextType{Context Type}
+    BuildContext --> CallAPI[调用 LLM]
+    CallAPI --> Parse[解析输出]
 
-    ContextType -->|Werewolf| WolfContext[Werewolf Context<br/>- Teammate info<br/>- Kill history<br/>- Disguise strategy]
-    ContextType -->|Seer| SeerContext[Seer Context<br/>- Check history<br/>- Identity reveal<br/>- Check strategy]
-    ContextType -->|Witch| WitchContext[Witch Context<br/>- Potion usage<br/>- Killed player<br/>- Save/poison decision]
-    ContextType -->|Hunter| HunterContext[Hunter Context<br/>- Identity exposure<br/>- Shoot target choice]
-    ContextType -->|Villager| VillagerContext[Villager Context<br/>- Speech analysis<br/>- Logical reasoning]
+    Parse --> Validate{格式正确?}
+    Validate -->|是| Return[返回结果]
+    Validate -->|否| Retry[重试请求]
 
-    WolfContext --> CallAPI[Call DeepSeek API]
-    SeerContext --> CallAPI
-    WitchContext --> CallAPI
-    HunterContext --> CallAPI
-    VillagerContext --> CallAPI
-
-    CallAPI --> ParseResponse[Parse AI Response]
-    ParseResponse --> ExtractDecision[Extract Decision]
-
-    ExtractDecision --> ValidateDecision{Validate Decision}
-    ValidateDecision -->|Valid| ReturnDecision[Return Decision]
-    ValidateDecision -->|Invalid| Retry[Retry Request]
     Retry --> CallAPI
 
-    ReturnDecision --> UpdateMemory[Update Memory]
-    UpdateMemory --> End([Decision Complete])
+    Return --> Update[写入短期记忆]
+    Update --> End([完成])
 
-    style Start fill:#90EE90
-    style End fill:#FFB6C1
-    style CallAPI fill:#FF6B6B
+    style Start fill:#C8E6C9
+    style End fill:#FFCDD2
+    style CallAPI fill:#FFAB91
 ```
-
-## Long-term Memory System Flow
 
 ```mermaid
 graph TB
-    Start([Game End]) --> Analyze[Game Analysis]
+    Start([任务结束]) --> Analyze[分析写作过程]
+    Analyze --> Extract[提取关键节点]
+    Extract --> Eval[评估质量]
+    Eval --> Insight[生成经验总结]
 
-    Analyze --> ExtractKey[Extract Key Moments]
-    ExtractKey --> EvaluatePlayer[Evaluate Player Performance]
-    EvaluatePlayer --> GenerateInsight[Generate Lessons Learned]
+    Insight --> Split{按角色分类}
+    Split --> TopicMem
+    Split --> SearchMem
+    Split --> OutlineMem
+    Split --> DraftMem
+    Split --> ReviewMem
 
-    GenerateInsight --> RoleInsight{Classify by Role}
+    TopicMem --> Save
+    SearchMem --> Save
+    OutlineMem --> Save
+    DraftMem --> Save
+    ReviewMem --> Save
 
-    RoleInsight --> WolfInsight[Werewolf Experience<br/>- Disguise techniques<br/>- Kill strategy<br/>- Response methods]
-    RoleInsight --> SeerInsight[Seer Experience<br/>- Check priority<br/>- Reveal timing<br/>- Info relay]
-    RoleInsight --> WitchInsight[Witch Experience<br/>- Potion timing<br/>- Save judgment<br/>- Poison target]
-    RoleInsight --> OtherInsight[Other Role Experience]
+    Save --> Limit{超过数量?}
+    Limit -->|是| Clean[清理历史]
+    Limit -->|否| Done
 
-    WolfInsight --> SaveMemory[Save to Memory File]
-    SeerInsight --> SaveMemory
-    WitchInsight --> SaveMemory
-    OtherInsight --> SaveMemory
-
-    SaveMemory --> LimitHistory{Exceed History Limit?}
-    LimitHistory -->|Yes| CleanOld[Clean Oldest Records]
-    LimitHistory -->|No| Done
-    CleanOld --> Done[Complete Save]
-
-    Done --> NextGame([Next Game Starts])
-    NextGame --> LoadMemory[Load History Experience]
-    LoadMemory --> InjectPrompt[Inject into Role Prompt]
-    InjectPrompt --> ImprovedAI[Improved AI Performance]
-
-    style Start fill:#FFE66D
-    style ImprovedAI fill:#4ECDC4
+    Done --> Next([下个任务加载经验])
 ```
-
-## Core Class Relationship Diagram
 
 ```mermaid
 classDiagram
-    class WerewolfConfig {
-        +TOTAL_PLAYERS: int
-        +ROLE_CONFIG: dict
-        +TEMPERATURE: float
-        +MAX_SPEECH_WORDS: int
+    class WritingConfig {
+        +MAX_TOKENS:int
+        +TARGET_WORDS:int
+        +STYLE:str
+        +LANGUAGE:str
         +validate()
     }
 
-    class DeepSeekClient {
-        -client: OpenAI
-        -model: str
-        +chat(system, user): str
-        +chat_with_context(messages): str
+    class LLMClient {
+        -client
+        -model
+        +chat(system,user):str
+        +chat_with_messages(list):str
     }
 
-    class BasePlayer {
-        #player_id: int
-        #role: str
-        #is_alive: bool
-        #client: DeepSeekClient
-        +speak(context): str
-        +vote(context): int
-        #_build_system_prompt(): str
+    class BaseAgent {
+        #name
+        #role
+        #client
+        +perform_task(dict):dict
     }
 
-    class Werewolf {
-        +discuss_kill_target(): int
+    class TopicAgent
+    class SearchAgent
+    class OutlineAgent
+    class DraftAgent
+    class ReviewerAgent
+    class RewriterAgent
+    class CitationAgent
+
+    BaseAgent <|-- TopicAgent
+    BaseAgent <|-- SearchAgent
+    BaseAgent <|-- OutlineAgent
+    BaseAgent <|-- DraftAgent
+    BaseAgent <|-- ReviewerAgent
+    BaseAgent <|-- RewriterAgent
+    BaseAgent <|-- CitationAgent
+
+    class DocumentState {
+        +title
+        +outline
+        +sections
+        +reviews
+        +export_full_text()
     }
 
-    class Seer {
-        +decide_check_target(): int
-    }
-
-    class Witch {
-        +decide_use_antidote(): bool
-        +decide_use_poison(): int
-    }
-
-    class Hunter {
-        +decide_shoot_target(): int
-    }
-
-    class Villager {
-    }
-
-    class GameState {
-        +players: list
-        +day: int
-        +alive_players: list
-        +dead_players: list
-        +speech_history: list
-        +vote_history: list
-        +update_player_status()
-        +record_speech()
-        +record_vote()
-        +export_to_dict(): dict
-    }
-
-    class WerewolfGame {
-        -config: WerewolfConfig
-        -state: GameState
-        -players: list
-        +initialize_game()
-        +night_phase()
-        +day_phase()
-        +check_win_condition(): str
+    class WritingOrchestrator {
+        -config
+        -state
+        -agents
+        -memory
         +run()
+        +run_planning_phase()
+        +run_draft_phase()
+        +run_review_phase()
     }
 
-    class GameAnalyzer {
-        +analyze_game(state): dict
-        +find_key_moments(): list
-        +evaluate_players(): dict
-        +extract_lessons(): dict
-    }
-
-    class MemoryManager {
-        +load_memories(): dict
-        +save_game_result()
-        +update_role_memory()
-        +get_role_history(): list
-    }
-
-    BasePlayer <|-- Werewolf
-    BasePlayer <|-- Seer
-    BasePlayer <|-- Witch
-    BasePlayer <|-- Hunter
-    BasePlayer <|-- Villager
-
-    WerewolfGame --> WerewolfConfig
-    WerewolfGame --> GameState
-    WerewolfGame --> BasePlayer
-    WerewolfGame --> GameAnalyzer
-    WerewolfGame --> MemoryManager
-
-    BasePlayer --> DeepSeekClient
-
-    GameAnalyzer --> GameState
-    MemoryManager --> GameState
+    LLMClient --> BaseAgent
+    WritingOrchestrator --> DocumentState
+    WritingOrchestrator --> BaseAgent
 ```
-
-## Data Flow Diagram
 
 ```mermaid
 graph LR
-    subgraph "Input Layer"
-        ENV[.env Config]
-        Memory[History Memory Files]
+    subgraph Input
+        UserReq[写作需求]
+        Env[环境配置]
+        PastMem[历史记忆]
     end
 
-    subgraph "Processing Layer"
-        Config[Game Config]
-        GameMaster[Game Master]
-        Agents[AI Agent Group]
-        API[DeepSeek API]
+    subgraph Process
+        Config[WritingConfig]
+        Orchestrator[WritingOrchestrator]
+        Agents[Agents]
+        API[LLM API]
     end
 
-    subgraph "Output Layer"
-        Console[Console Output]
-        History[Game History Records]
-        Analysis[Game Analysis]
-        NewMemory[Update Memory]
+    subgraph Output
+        DraftOut[最终文稿]
+        Log[写作日志]
+        Ana[分析报告]
+        NewMem[更新记忆]
     end
 
-    ENV --> Config
-    Memory --> Agents
+    UserReq --> Orchestrator
+    Env --> Config
+    Config --> Orchestrator
 
-    Config --> GameMaster
-    GameMaster --> Agents
+    PastMem --> Agents
+    Orchestrator --> Agents
     Agents --> API
     API --> Agents
-    Agents --> GameMaster
+    Agents --> Orchestrator
 
-    GameMaster --> Console
-    GameMaster --> History
-    GameMaster --> Analysis
-    Analysis --> NewMemory
-
-    NewMemory -.Next Game.-> Memory
-
-    style ENV fill:#E8F5E9
-    style API fill:#FFEBEE
-    style Console fill:#E3F2FD
-    style NewMemory fill:#FFF3E0
+    Orchestrator --> DraftOut
+    Orchestrator --> Log
+    Orchestrator --> Ana
+    Ana --> NewMem
 ```
-
-## Key Design Patterns
-
-### 1. Observer Pattern
-- **GameState** maintains game state
-- **WerewolfGame** observes and responds to state changes
-- **AI Agents** make decisions based on state
-
-### 2. Strategy Pattern
-- **BasePlayer** defines common interface
-- Each role class implements different strategy methods
-- Runtime calls corresponding strategy based on role type
-
-### 3. Singleton Pattern
-- **DeepSeekClient** globally shares one API client
-- **MemoryManager** centrally manages memory files
-
-### 4. Template Method Pattern
-- **BasePlayer** defines decision-making process framework
-- Subclasses override `_build_system_prompt()` to customize behavior
-
-## Performance Optimization Points
-
-1. **API Call Optimization**
-   - Cache API client instance
-   - Concurrent processing of independent AI decisions (optional)
-
-2. **Memory System Optimization**
-   - Limit history record count (MAX_HISTORY_GAMES)
-   - Load only relevant role memories
-
-3. **Prompt Optimization**
-   - Streamline context information
-   - Use structured output format
-   - Word limits prevent overly long responses
-
-4. **State Management Optimization**
-   - Incremental updates instead of full copy
-   - Lazy loading of historical records
